@@ -125,6 +125,7 @@ find_source_binary() {
     "$SCRIPT_DIR/urlbridge-host"
     "$SCRIPT_DIR/$binary_name"
     "$ROOT_DIR/urlbridge-host"
+    "$ROOT_DIR/$binary_name"
     "$ROOT_DIR/dist/$binary_name"
   )
 

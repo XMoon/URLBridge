@@ -3,7 +3,12 @@ GOCACHE ?= $(abspath ./.cache/go-build)
 
 export GOCACHE
 
-.PHONY: fmt test build-host build-guest build-all clean
+.PHONY: fmt test build-host build-guest build-all stage-dist-scripts clean
+
+stage-dist-scripts:
+	mkdir -p $(DIST_DIR)
+	rm -rf $(DIST_DIR)/scripts
+	cp -R scripts $(DIST_DIR)/scripts
 
 fmt:
 	gofmt -w .
@@ -11,17 +16,14 @@ fmt:
 test:
 	go test ./...
 
-build-host:
-	mkdir -p $(DIST_DIR)
+build-host: stage-dist-scripts
 	go build -o $(DIST_DIR)/urlbridge-host ./cmd/urlbridge-host
 
-build-guest:
-	mkdir -p $(DIST_DIR)
+build-guest: stage-dist-scripts
 	GOOS=windows GOARCH=amd64 go build -o $(DIST_DIR)/urlbridge-browser.exe -ldflags="-H=windowsgui" ./cmd/urlbridge-browser
 	GOOS=windows GOARCH=amd64 go build -o $(DIST_DIR)/urlbridge-guestctl.exe ./cmd/urlbridge-guestctl
 
-build-all:
-	mkdir -p $(DIST_DIR)
+build-all: stage-dist-scripts
 	go build -o $(DIST_DIR)/urlbridge-host-linux-amd64 ./cmd/urlbridge-host
 	GOOS=linux GOARCH=arm64 go build -o $(DIST_DIR)/urlbridge-host-linux-arm64 ./cmd/urlbridge-host
 	GOOS=windows GOARCH=amd64 go build -o $(DIST_DIR)/urlbridge-host-windows-amd64.exe ./cmd/urlbridge-host

@@ -12,7 +12,6 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     env:
-      PACKAGE_OUTPUT_DIR: ${{ runner.temp }}/urlbridge-packages
       RELEASE_TAG: ${{ github.ref_name }}
 
     steps:
@@ -31,18 +30,21 @@ jobs:
         run: make build-all
 
       - name: Create release bundles
+        env:
+          PACKAGE_OUTPUT_DIR: ${{ runner.temp }}/urlbridge-packages
         run: ./scripts/package-release.sh
 
       - name: Upload GitHub Actions artifact
         uses: actions/upload-artifact@v4
         with:
           name: urlbridge-packages-${{ github.ref_name }}
-          path: ${{ env.PACKAGE_OUTPUT_DIR }}/*
+          path: ${{ runner.temp }}/urlbridge-packages/*
           if-no-files-found: error
 
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          PACKAGE_OUTPUT_DIR: ${{ runner.temp }}/urlbridge-packages
         run: |
           set -euo pipefail
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then

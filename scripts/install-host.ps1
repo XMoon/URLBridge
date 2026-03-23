@@ -68,6 +68,7 @@ $sourceBinary = Resolve-SourceBinary @(
     (Join-Path $scriptDir "urlbridge-host.exe"),
     (Join-Path $scriptDir $binaryName),
     (Join-Path $rootDir "urlbridge-host.exe"),
+    (Join-Path $rootDir $binaryName),
     (Join-Path $rootDir "dist\$binaryName")
 )
 

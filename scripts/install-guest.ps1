@@ -34,6 +34,8 @@ if ($arch -eq "arm64") {
     $guestCtl = Resolve-Binary @(
         (Join-Path $scriptDir "urlbridge-guestctl-arm64.exe"),
         (Join-Path $scriptDir "urlbridge-guestctl.exe"),
+        (Join-Path $rootDir "urlbridge-guestctl-arm64.exe"),
+        (Join-Path $rootDir "urlbridge-guestctl.exe"),
         (Join-Path $rootDir "dist\urlbridge-guestctl-arm64.exe"),
         (Join-Path $rootDir "dist\urlbridge-guestctl.exe")
     )
@@ -41,6 +43,7 @@ if ($arch -eq "arm64") {
 else {
     $guestCtl = Resolve-Binary @(
         (Join-Path $scriptDir "urlbridge-guestctl.exe"),
+        (Join-Path $rootDir "urlbridge-guestctl.exe"),
         (Join-Path $rootDir "dist\urlbridge-guestctl.exe")
     )
 }
