@@ -31,7 +31,9 @@ func main() {
 	}
 
 	target := args[0]
-	if err := guest.ForwardURL(target, *configPath); err != nil {
+	if err := guest.ForwardURLWithNotice(target, *configPath, func(message string) {
+		guest.ShowErrorDialog("URL Bridge", message)
+	}); err != nil {
 		guest.ShowErrorDialog("URL Bridge", err.Error())
 	}
 }

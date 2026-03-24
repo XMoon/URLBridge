@@ -17,6 +17,7 @@ import (
 type InstallOptions struct {
 	HostBaseURL      string
 	Token            string
+	BrowserPath      string
 	ConfigPath       string
 	OpenSettingsPage bool
 	TimeoutSeconds   int
@@ -24,7 +25,7 @@ type InstallOptions struct {
 
 func Install(opts InstallOptions) error {
 	if opts.TimeoutSeconds <= 0 {
-		opts.TimeoutSeconds = 5
+		opts.TimeoutSeconds = 3
 	}
 
 	installDir, err := InstallDir()
@@ -54,6 +55,7 @@ func Install(opts InstallOptions) error {
 		HostBaseURL:           opts.HostBaseURL,
 		Token:                 opts.Token,
 		RequestTimeoutSeconds: opts.TimeoutSeconds,
+		BrowserPath:           opts.BrowserPath,
 	}, configPath); err != nil {
 		return err
 	}

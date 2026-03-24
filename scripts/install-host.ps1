@@ -75,8 +75,9 @@ $sourceBinary = Resolve-SourceBinary @(
 $installDir = Join-Path $env:LOCALAPPDATA "URLBridgeHost"
 $installedBinary = Join-Path $installDir "urlbridge-host.exe"
 $runnerScript = Join-Path $installDir "start-host.ps1"
-$logFile = Join-Path $installDir "host.log"
 $discovery = "true"
+$hasExistingLogPath = $false
+$existingLogPath = ""
 
 if (-not $ConfigPath) {
     $ConfigPath = Join-Path $installDir "config.yaml"
@@ -104,6 +105,11 @@ if (Test-Path $ConfigPath) {
     if ($existingDiscovery) {
         $discovery = Normalize-BoolValue $existingDiscovery
     }
+
+    if (Select-String -Path $ConfigPath -Pattern "^\s*log_path:\s*" -Quiet) {
+        $existingLogPath = Get-YamlScalar -Path $ConfigPath -Key "log_path"
+        $hasExistingLogPath = $true
+    }
 }
 
 if (-not $Token) {
@@ -112,11 +118,15 @@ if (-not $Token) {
 
 $configDir = Split-Path -Parent $ConfigPath
 New-Item -ItemType Directory -Force -Path $configDir | Out-Null
-$configContent = @"
-listen_addr: $(ConvertTo-YamlSingleQuoted $Listen)
-token: $(ConvertTo-YamlSingleQuoted $Token)
-discovery: $discovery
-"@
+$configLines = @(
+    "listen_addr: $(ConvertTo-YamlSingleQuoted $Listen)",
+    "token: $(ConvertTo-YamlSingleQuoted $Token)",
+    "discovery: $discovery"
+)
+if ($hasExistingLogPath) {
+    $configLines += "log_path: $(ConvertTo-YamlSingleQuoted $existingLogPath)"
+}
+$configContent = ($configLines -join "`r`n") + "`r`n"
 Set-Content -Path $ConfigPath -Value $configContent -Encoding ASCII
 
 $installedBinaryLiteral = $installedBinary.Replace("'", "''")

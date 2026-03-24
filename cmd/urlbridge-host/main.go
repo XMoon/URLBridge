@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,24 +14,40 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "token", "secret":
 			token, err := bridge.RandomToken(16)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			fmt.Println(token)
-			return
+			return nil
 		}
 	}
 
 	cfg, err := parseRuntimeConfig(os.Args[1:])
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	logger := log.New(os.Stdout, "", log.LstdFlags)
+	logger, closer, err := host.NewLogger(os.Stdout, cfg)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closer != nil {
+			_ = closer.Close()
+		}
+	}()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -42,8 +57,10 @@ func main() {
 		Discovery:  cfg.Discovery,
 		Logger:     logger,
 	}); err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }
 
 func parseRuntimeConfig(args []string) (host.FileConfig, error) {

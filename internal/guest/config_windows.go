@@ -28,6 +28,7 @@ type Config struct {
 	HostBaseURL           string `yaml:"host_base_url,omitempty"`
 	Token                 string `yaml:"token,omitempty"`
 	RequestTimeoutSeconds int    `yaml:"request_timeout_seconds,omitempty"`
+	BrowserPath           string `yaml:"browser_path,omitempty"`
 }
 
 type ConfigState struct {
@@ -40,7 +41,7 @@ type ConfigState struct {
 
 func defaultConfig() Config {
 	return Config{
-		RequestTimeoutSeconds: 5,
+		RequestTimeoutSeconds: 3,
 	}
 }
 
@@ -161,6 +162,7 @@ func SaveConfig(cfg Config, path string) error {
 func (c *Config) Normalize() error {
 	c.HostBaseURL = strings.TrimSpace(c.HostBaseURL)
 	c.Token = strings.TrimSpace(c.Token)
+	c.BrowserPath = strings.TrimSpace(c.BrowserPath)
 
 	if c.RequestTimeoutSeconds <= 0 {
 		return fmt.Errorf("request timeout must be greater than zero")

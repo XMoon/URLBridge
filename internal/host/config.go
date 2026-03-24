@@ -13,9 +13,10 @@ import (
 const ConfigFileName = "config.yaml"
 
 type FileConfig struct {
-	ListenAddr string `yaml:"listen_addr"`
-	Token      string `yaml:"token,omitempty"`
-	Discovery  bool   `yaml:"discovery"`
+	ListenAddr string         `yaml:"listen_addr"`
+	Token      string         `yaml:"token,omitempty"`
+	Discovery  bool           `yaml:"discovery"`
+	LogPath    OptionalString `yaml:"log_path,omitempty"`
 }
 
 func DefaultFileConfig() FileConfig {
@@ -54,12 +55,55 @@ func LoadFileConfig(explicitPath string) (FileConfig, string, error) {
 func (c *FileConfig) Normalize() error {
 	c.ListenAddr = strings.TrimSpace(c.ListenAddr)
 	c.Token = strings.TrimSpace(c.Token)
+	c.LogPath.TrimSpace()
 
 	if c.ListenAddr == "" {
 		return fmt.Errorf("listen address is required")
 	}
 
 	return nil
+}
+
+type OptionalString struct {
+	set   bool
+	value string
+}
+
+func (s *OptionalString) UnmarshalYAML(unmarshal func(any) error) error {
+	var value string
+	if err := unmarshal(&value); err != nil {
+		return err
+	}
+
+	s.set = true
+	s.value = value
+	return nil
+}
+
+func (s OptionalString) MarshalYAML() (any, error) {
+	if !s.set {
+		return nil, nil
+	}
+	return s.value, nil
+}
+
+func (s OptionalString) IsZero() bool {
+	return !s.set
+}
+
+func (s OptionalString) IsSet() bool {
+	return s.set
+}
+
+func (s OptionalString) Value() string {
+	return s.value
+}
+
+func (s *OptionalString) TrimSpace() {
+	if !s.set {
+		return
+	}
+	s.value = strings.TrimSpace(s.value)
 }
 
 func platformDefaultConfigPaths() []string {

@@ -71,6 +71,7 @@ URL Bridge 现在支持宿主端和 Windows 访客端都使用 `config.yaml`。�
 listen_addr: "0.0.0.0:38495"
 token: "YOUR_TOKEN"
 discovery: true
+log_path: "/path/to/host.log" # 可选；设为 "" 可关闭文件日志
 ```
 
 访客端配置示例：
@@ -78,7 +79,8 @@ discovery: true
 ```yaml
 host_base_url: "http://10.0.2.2:38495/"
 token: "YOUR_TOKEN"
-request_timeout_seconds: 5
+request_timeout_seconds: 3
+browser_path: "C:/Program Files/Google/Chrome/Application/chrome.exe" # 可选
 ```
 
 ## 宿主机使用方式
@@ -106,6 +108,8 @@ request_timeout_seconds: 5
 - `0.0.0.0` 适合虚拟机通过虚拟网卡而不是本机回环访问宿主机服务的场景。
 - 服务会根据宿主机的 IPv4 网卡打印可供访客端使用的候选 URL。
 - 默认会启用 UDP `38496` 上的自动发现；如需关闭，可传 `--discovery=false`。
+- 宿主端日志始终会输出到 stdout，默认还会额外写入文件；如需关闭文件日志，可设 `log_path: ""`。
+- 宿主端默认日志路径分别是：Windows 的 `%LOCALAPPDATA%\URLBridgeHost\host.log`，Linux 的 `$XDG_STATE_HOME/urlbridge/host.log` 或 `~/.local/state/urlbridge/host.log`，macOS 的 `~/Library/Logs/URLBridge/host.log`。
 - Linux 上会优先使用 `xdg-open`，然后回退到 `gio open`。
 - macOS 上使用 `open`，Windows 上使用 `rundll32 url.dll,FileProtocolHandler`。
 
@@ -170,6 +174,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-host.ps1
 
 - Windows 会打开通用的默认应用设置页，以兼容 Windows 10 和 Windows 11。
 - 把 `HTTP` 和 `HTTPS` 都设置为 `URL Bridge`。
+- 如果在配置超时内无法连接宿主机，访客端会回退到本地浏览器；默认先尝试 Chrome，再尝试 Edge，也可以通过 `browser_path` 显式指定。
 
 常用访客端命令：
 
@@ -191,7 +196,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-host.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\install-guest.ps1
 ```
 
-访客端安装脚本默认会把配置写到 `%LOCALAPPDATA%\URLBridge\config.yaml`，并在注册 URL handler 时显式带上 `--config`。如果你希望完全显式配置，也可以继续传 `-HostUrl`、`-Token` 或 `-ConfigPath`。
+访客端安装脚本默认会把配置写到 `%LOCALAPPDATA%\URLBridge\config.yaml`，并在注册 URL handler 时显式带上 `--config`。它会保留已有的 `browser_path`，并默认使用 3 秒的宿主机请求超时；如果你希望完全显式配置，也可以继续传 `-HostUrl`、`-Token` 或 `-ConfigPath`。
 
 ## 当前限制
 

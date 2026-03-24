@@ -7,12 +7,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/xmoon/urlbridge/internal/bridge"
 )
 
 func ForwardURL(rawURL, configPath string) error {
+	return ForwardURLWithNotice(rawURL, configPath, nil)
+}
+
+func ForwardURLWithNotice(rawURL, configPath string, notify func(string)) error {
 	cfg, _, err := LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -23,9 +28,20 @@ func ForwardURL(rawURL, configPath string) error {
 		return err
 	}
 
+	failure := forwardToHost(targetURL, cfg)
+	if failure.Err == nil {
+		return nil
+	}
+
+	return handleHostForwardFailure(failure, notify, func() error {
+		return OpenLocalBrowser(targetURL, cfg.BrowserPath)
+	})
+}
+
+func forwardToHost(targetURL string, cfg Config) hostForwardFailure {
 	openEndpoint, err := endpointURL(cfg.HostBaseURL, "/open")
 	if err != nil {
-		return err
+		return hostForwardFailure{Err: err}
 	}
 
 	body, err := json.Marshal(bridge.OpenRequest{
@@ -33,13 +49,13 @@ func ForwardURL(rawURL, configPath string) error {
 		Source: "windows-vm",
 	})
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return hostForwardFailure{Err: fmt.Errorf("marshal request: %w", err)}
 	}
 
 	client := &http.Client{Timeout: time.Duration(cfg.RequestTimeoutSeconds) * time.Second}
 	req, err := http.NewRequest(http.MethodPost, openEndpoint, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return hostForwardFailure{Err: fmt.Errorf("create request: %w", err)}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if cfg.Token != "" {
@@ -48,28 +64,22 @@ func ForwardURL(rawURL, configPath string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("send to host: %w", err)
+		return classifyHostForwardFailure(0, "", "", fmt.Errorf("send to host: %w", err))
 	}
 	defer resp.Body.Close()
 
 	var openResp bridge.OpenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&openResp); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return classifyHostForwardFailure(0, "", "", fmt.Errorf("decode response: %w", err))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		if openResp.Message == "" {
-			openResp.Message = resp.Status
-		}
-		return fmt.Errorf("host refused request: %s", openResp.Message)
+		return classifyHostForwardFailure(resp.StatusCode, resp.Status, strings.TrimSpace(openResp.Message), nil)
 	}
 
 	if !openResp.OK {
-		if openResp.Message == "" {
-			openResp.Message = "host did not accept the request"
-		}
-		return fmt.Errorf(openResp.Message)
+		return classifyHostForwardFailure(resp.StatusCode, resp.Status, strings.TrimSpace(openResp.Message), nil)
 	}
 
-	return nil
+	return hostForwardFailure{}
 }

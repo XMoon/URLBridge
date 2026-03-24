@@ -86,6 +86,7 @@ func install(args []string) {
 	if err := guest.Install(guest.InstallOptions{
 		HostBaseURL:      cfg.HostBaseURL,
 		Token:            cfg.Token,
+		BrowserPath:      cfg.BrowserPath,
 		ConfigPath:       resolvedConfigPath,
 		OpenSettingsPage: !*noOpenSettings,
 		TimeoutSeconds:   cfg.RequestTimeoutSeconds,

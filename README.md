@@ -73,6 +73,7 @@ Example host config:
 listen_addr: "0.0.0.0:38495"
 token: "YOUR_TOKEN"
 discovery: true
+log_path: "/path/to/host.log" # optional; use "" to disable file logging
 ```
 
 Example guest config:
@@ -80,7 +81,8 @@ Example guest config:
 ```yaml
 host_base_url: "http://10.0.2.2:38495/"
 token: "YOUR_TOKEN"
-request_timeout_seconds: 5
+request_timeout_seconds: 3
+browser_path: "C:/Program Files/Google/Chrome/Application/chrome.exe" # optional
 ```
 
 ## Host usage
@@ -108,6 +110,8 @@ Notes:
 - `0.0.0.0` is useful because the VM usually reaches the host over a virtual NIC instead of loopback.
 - The service prints candidate host URLs based on the host machine's IPv4 interfaces.
 - Discovery is enabled by default on UDP `38496`; disable it with `--discovery=false`.
+- Host logs always go to stdout, and by default also to a file. Set `log_path: ""` to disable file logging.
+- Default host log paths are `%LOCALAPPDATA%\URLBridgeHost\host.log` on Windows, `$XDG_STATE_HOME/urlbridge/host.log` or `~/.local/state/urlbridge/host.log` on Linux, and `~/Library/Logs/URLBridge/host.log` on macOS.
 - On Linux, URL Bridge uses `xdg-open`, then falls back to `gio open`.
 - On macOS it uses `open`, and on Windows it uses `rundll32 url.dll,FileProtocolHandler`.
 
@@ -172,6 +176,7 @@ After installation:
 
 - Windows opens the general Default Apps page for compatibility with both Windows 10 and Windows 11.
 - Set `HTTP` and `HTTPS` to `URL Bridge`.
+- If the host cannot be reached within the configured timeout, the VM falls back to a local browser. By default it tries Chrome first, then Edge, or you can set `browser_path`.
 
 Useful guest commands:
 
@@ -193,7 +198,7 @@ From the repo root or from a packaged guest bundle:
 powershell -ExecutionPolicy Bypass -File .\scripts\install-guest.ps1
 ```
 
-The guest installer writes the config to `%LOCALAPPDATA%\URLBridge\config.yaml` by default and registers the Windows URL handler with an explicit `--config` argument. You can still pass `-HostUrl`, `-Token`, or `-ConfigPath` if you prefer a fully explicit setup.
+The guest installer writes the config to `%LOCALAPPDATA%\URLBridge\config.yaml` by default and registers the Windows URL handler with an explicit `--config` argument. It keeps any existing `browser_path` value and uses a 3-second host timeout unless you override it. You can still pass `-HostUrl`, `-Token`, or `-ConfigPath` if you prefer a fully explicit setup.
 
 ## Current limitations
 

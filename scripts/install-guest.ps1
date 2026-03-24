@@ -2,7 +2,7 @@ param(
     [string]$HostUrl = "",
     [string]$Token = "",
     [string]$ConfigPath = "",
-    [int]$TimeoutSeconds = 5,
+    [int]$TimeoutSeconds = 3,
     [switch]$NoOpenSettings
 )
 

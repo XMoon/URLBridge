@@ -13,6 +13,8 @@ LISTEN_SET=0
 TOKEN_SET=0
 NO_AUTOSTART=0
 DISCOVERY="true"
+LOG_PATH=""
+LOG_PATH_PRESENT=0
 
 usage() {
   cat <<'EOF'
@@ -26,11 +28,14 @@ EOF
 read_yaml_value() {
   local key="$1"
   local file="$2"
-  local value
-  value="$(sed -nE "s/^[[:space:]]*${key}:[[:space:]]*(.*)[[:space:]]*$/\\1/p" "$file" | head -n1)"
-  if [[ -z "$value" ]]; then
+  local line value
+  line="$(grep -m1 -E "^[[:space:]]*${key}:[[:space:]]*.*$" "$file" || true)"
+  if [[ -z "$line" ]]; then
     return 1
   fi
+
+  value="${line#*:}"
+  value="$(printf '%s' "$value" | sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//')"
 
   if [[ "$value" == \'*\' ]]; then
     value="${value#\'}"
@@ -143,8 +148,7 @@ find_source_binary() {
 
 start_for_current_session() {
   local runner="$1"
-  local log_file="$INSTALL_DIR/host.log"
-  nohup "$runner" >"$log_file" 2>&1 &
+  nohup "$runner" >/dev/null 2>&1 </dev/null &
 }
 
 BINARY_NAME="$(detect_binary_name)"
@@ -182,6 +186,11 @@ if [[ -f "$CONFIG_PATH" ]]; then
   if [[ -n "$EXISTING_DISCOVERY" ]]; then
     DISCOVERY="$(normalize_bool "$EXISTING_DISCOVERY")"
   fi
+
+  if read_yaml_value "log_path" "$CONFIG_PATH" >/dev/null; then
+    LOG_PATH="$(read_yaml_value "log_path" "$CONFIG_PATH")"
+    LOG_PATH_PRESENT=1
+  fi
 fi
 
 if [[ -z "$TOKEN" ]]; then
@@ -198,6 +207,11 @@ listen_addr: '$LISTEN_ADDR_YAML'
 token: '$TOKEN_YAML'
 discovery: $DISCOVERY
 EOF
+
+if [[ "$LOG_PATH_PRESENT" -eq 1 ]]; then
+  LOG_PATH_YAML="$(yaml_quote "$LOG_PATH")"
+  printf "log_path: '%s'\n" "$LOG_PATH_YAML" >>"$CONFIG_PATH"
+fi
 
 INSTALLED_BINARY_Q="$(printf '%q' "$INSTALLED_BINARY")"
 CONFIG_PATH_Q="$(printf '%q' "$CONFIG_PATH")"
@@ -269,10 +283,6 @@ EOF
   <true/>
   <key>KeepAlive</key>
   <true/>
-  <key>StandardOutPath</key>
-  <string>$INSTALL_DIR/host.log</string>
-  <key>StandardErrorPath</key>
-  <string>$INSTALL_DIR/host.log</string>
 </dict>
 </plist>
 EOF
@@ -295,6 +305,3 @@ echo "Config file: $CONFIG_PATH"
 echo "Listen address: $LISTEN_ADDR"
 echo "Token: $TOKEN"
 echo "Autostart: $AUTOSTART_STATUS"
-if [[ "$STARTED_NOW" -eq 1 ]]; then
-  echo "Current-session log: $INSTALL_DIR/host.log"
-fi
