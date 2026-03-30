@@ -1,5 +1,5 @@
 pkgname=urlbridge-host
-pkgver=0.0.2
+pkgver=0.0.3
 pkgrel=1
 pkgdesc="Forward URLs from a Windows VM to the host system browser"
 arch=('x86_64' 'aarch64')
