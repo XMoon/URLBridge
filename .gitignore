@@ -1,2 +1,6 @@
 .cache/
 dist/
+src/
+pkg/
+*.tar.gz
+*.tar.zst
