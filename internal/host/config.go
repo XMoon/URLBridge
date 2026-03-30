@@ -52,6 +52,53 @@ func LoadFileConfig(explicitPath string) (FileConfig, string, error) {
 	return cfg, lookup.Path, nil
 }
 
+func SaveFileConfig(cfg FileConfig, path string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("config path is required")
+	}
+
+	if err := cfg.Normalize(); err != nil {
+		return err
+	}
+
+	data, err := bridge.EncodeYAML(cfg)
+	if err != nil {
+		return fmt.Errorf("encode host config: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write host config: %w", err)
+	}
+
+	return nil
+}
+
+func DefaultConfigPath() (string, error) {
+	defaultPaths := platformDefaultConfigPaths()
+	if len(defaultPaths) > 0 {
+		return defaultPaths[0], nil
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
+		executable = ""
+	}
+
+	candidates, err := bridge.ConfigCandidatePaths(executable, ConfigFileName, nil)
+	if err != nil {
+		return "", err
+	}
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("default config path is unavailable")
+	}
+
+	return candidates[0], nil
+}
+
 func (c *FileConfig) Normalize() error {
 	c.ListenAddr = strings.TrimSpace(c.ListenAddr)
 	c.Token = strings.TrimSpace(c.Token)

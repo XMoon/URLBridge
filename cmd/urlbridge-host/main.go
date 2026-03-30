@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/xmoon/urlbridge/internal/bridge"
@@ -38,7 +39,7 @@ func run() error {
 		return err
 	}
 
-	logger, closer, err := host.NewLogger(os.Stdout, cfg)
+	logger, closer, err := host.NewLogger(os.Stdout, cfg.FileConfig)
 	if err != nil {
 		return err
 	}
@@ -51,10 +52,14 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if cfg.TokenGenerated {
+		logger.Printf("generated a new host token and saved it to %s; check the config file to retrieve the token", cfg.ConfigPath)
+	}
+
 	if err := host.Serve(ctx, host.Config{
-		ListenAddr: cfg.ListenAddr,
-		Token:      cfg.Token,
-		Discovery:  cfg.Discovery,
+		ListenAddr: cfg.FileConfig.ListenAddr,
+		Token:      cfg.FileConfig.Token,
+		Discovery:  cfg.FileConfig.Discovery,
 		Logger:     logger,
 	}); err != nil {
 		return err
@@ -63,7 +68,13 @@ func run() error {
 	return nil
 }
 
-func parseRuntimeConfig(args []string) (host.FileConfig, error) {
+type runtimeConfig struct {
+	host.FileConfig
+	ConfigPath     string
+	TokenGenerated bool
+}
+
+func parseRuntimeConfig(args []string) (runtimeConfig, error) {
 	fs := flag.NewFlagSet("urlbridge-host", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
@@ -72,12 +83,12 @@ func parseRuntimeConfig(args []string) (host.FileConfig, error) {
 	token := fs.String("token", "", "shared secret expected from the Windows guest")
 	discovery := fs.Bool("discovery", false, "enable UDP host discovery")
 	if err := fs.Parse(args); err != nil {
-		return host.FileConfig{}, err
+		return runtimeConfig{}, err
 	}
 
-	cfg, _, err := host.LoadFileConfig(*configPath)
+	cfg, resolvedConfigPath, err := host.LoadFileConfig(*configPath)
 	if err != nil {
-		return host.FileConfig{}, err
+		return runtimeConfig{}, err
 	}
 
 	visited := visitedFlags(fs)
@@ -91,11 +102,38 @@ func parseRuntimeConfig(args []string) (host.FileConfig, error) {
 		cfg.Discovery = *discovery
 	}
 
-	if err := cfg.Normalize(); err != nil {
-		return host.FileConfig{}, err
+	tokenGenerated := false
+	if *configPath == "" && strings.TrimSpace(cfg.Token) == "" {
+		generatedToken, err := bridge.RandomToken(16)
+		if err != nil {
+			return runtimeConfig{}, err
+		}
+		cfg.Token = generatedToken
+		tokenGenerated = true
+
+		if strings.TrimSpace(resolvedConfigPath) == "" {
+			resolvedConfigPath, err = host.DefaultConfigPath()
+			if err != nil {
+				return runtimeConfig{}, err
+			}
+		}
 	}
 
-	return cfg, nil
+	if err := cfg.Normalize(); err != nil {
+		return runtimeConfig{}, err
+	}
+
+	if tokenGenerated {
+		if err := host.SaveFileConfig(cfg, resolvedConfigPath); err != nil {
+			return runtimeConfig{}, err
+		}
+	}
+
+	return runtimeConfig{
+		FileConfig:     cfg,
+		ConfigPath:     resolvedConfigPath,
+		TokenGenerated: tokenGenerated,
+	}, nil
 }
 
 func visitedFlags(fs *flag.FlagSet) map[string]bool {
