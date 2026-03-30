@@ -1,0 +1,11 @@
+[Unit]
+Description=URL Bridge Host Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/urlbridge-host
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
