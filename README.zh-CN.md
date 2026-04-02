@@ -174,7 +174,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-host.ps1
 
 - Windows 会打开通用的默认应用设置页，以兼容 Windows 10 和 Windows 11。
 - 把 `HTTP` 和 `HTTPS` 都设置为 `URL Bridge`。
-- 如果在配置超时内无法连接宿主机，访客端会回退到本地浏览器；默认先尝试 Chrome，再尝试 Edge，也可以通过 `browser_path` 显式指定。
+- 如果在配置超时内无法连接宿主机，访客端会回退到本地浏览器。`browser_path` 为空时，URL Bridge 会按 Chrome、Edge 的顺序自动探测，成功打开后把所选浏览器写回配置，后续直接复用。
+- 如果已保存的 `browser_path` 之后无法启动，URL Bridge 会重新探测本地浏览器，并在替换配置前弹出确认提示。
 
 常用访客端命令：
 
@@ -196,7 +197,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-host.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\install-guest.ps1
 ```
 
-访客端安装脚本默认会把配置写到 `%LOCALAPPDATA%\URLBridge\config.yaml`，并在注册 URL handler 时显式带上 `--config`。它会保留已有的 `browser_path`，并默认使用 3 秒的宿主机请求超时；如果你希望完全显式配置，也可以继续传 `-HostUrl`、`-Token` 或 `-ConfigPath`。
+访客端安装脚本默认会把配置写到 `%LOCALAPPDATA%\URLBridge\config.yaml`，并在注册 URL handler 时显式带上 `--config`。它会保留已有的 `browser_path`，并默认使用 3 秒的宿主机请求超时；如果 `browser_path` 仍为空，第一次真正发生本地浏览器回退时会自动探测并缓存。如果你希望完全显式配置，也可以继续传 `-HostUrl`、`-Token` 或 `-ConfigPath`。
 
 ## 当前限制
 

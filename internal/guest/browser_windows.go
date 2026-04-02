@@ -11,22 +11,22 @@ import (
 	"syscall"
 )
 
-func OpenLocalBrowser(targetURL, configuredPath string) error {
-	candidates := orderedBrowserCandidates(configuredPath, detectLocalBrowserCandidates())
-	if len(candidates) == 0 {
-		return fmt.Errorf("no local browser found; configure browser_path or install Chrome/Edge")
-	}
-
-	var failures []string
-	for _, candidate := range candidates {
-		if err := startBrowserProcess(candidate.Path, targetURL); err != nil {
-			failures = append(failures, fmt.Sprintf("%s (%s): %v", candidate.Name, candidate.Path, err))
-			continue
-		}
-		return nil
-	}
-
-	return fmt.Errorf("open local browser: %s", strings.Join(failures, "; "))
+func OpenLocalBrowser(targetURL string, cfg Config, configPath string, notify func(string)) error {
+	return runBrowserFallback(targetURL, browserFallbackRuntime{
+		ConfiguredPath: cfg.BrowserPath,
+		ConfigPath:     configPath,
+		Notify:         notify,
+		ConfirmReplacement: func(failedPath string, candidate browserCandidate) bool {
+			return ShowYesNoDialog("URL Bridge", replacementBrowserPrompt(failedPath, candidate))
+		},
+		DetectCandidates:    detectLocalBrowserCandidates,
+		StartBrowserProcess: startBrowserProcess,
+		SaveBrowserPath: func(browserPath string) error {
+			updated := cfg
+			updated.BrowserPath = browserPath
+			return SaveConfig(updated, configPath)
+		},
+	})
 }
 
 func detectLocalBrowserCandidates() []browserCandidate {
@@ -114,4 +114,13 @@ func startBrowserProcess(browserPath, targetURL string) error {
 	cmd := exec.Command(browserPath, targetURL)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	return cmd.Start()
+}
+
+func replacementBrowserPrompt(failedPath string, candidate browserCandidate) string {
+	return fmt.Sprintf(
+		"The configured local browser failed to start:\n%s\n\nUse %s for this link and update browser_path?\n%s",
+		strings.TrimSpace(failedPath),
+		candidate.Name,
+		candidate.Path,
+	)
 }

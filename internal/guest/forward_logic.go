@@ -71,7 +71,7 @@ func orderedBrowserCandidates(configuredPath string, detected []browserCandidate
 			continue
 		}
 
-		key := strings.ToLower(path)
+		key := browserPathKey(path)
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -84,4 +84,25 @@ func orderedBrowserCandidates(configuredPath string, detected []browserCandidate
 	}
 
 	return ordered
+}
+
+func excludeBrowserCandidatePath(candidates []browserCandidate, excludedPath string) []browserCandidate {
+	key := browserPathKey(excludedPath)
+	if key == "" {
+		return candidates
+	}
+
+	filtered := make([]browserCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		if browserPathKey(candidate.Path) == key {
+			continue
+		}
+		filtered = append(filtered, candidate)
+	}
+
+	return filtered
+}
+
+func browserPathKey(path string) string {
+	return strings.ToLower(strings.TrimSpace(path))
 }

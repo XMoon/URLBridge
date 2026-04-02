@@ -176,7 +176,8 @@ After installation:
 
 - Windows opens the general Default Apps page for compatibility with both Windows 10 and Windows 11.
 - Set `HTTP` and `HTTPS` to `URL Bridge`.
-- If the host cannot be reached within the configured timeout, the VM falls back to a local browser. By default it tries Chrome first, then Edge, or you can set `browser_path`.
+- If the host cannot be reached within the configured timeout, the VM falls back to a local browser. When `browser_path` is empty, URL Bridge auto-detects Chrome first, then Edge, opens the first one that works, and saves it to the config for later reuse.
+- If the saved `browser_path` later stops launching, URL Bridge re-detects local browsers and asks whether it should replace the stored path before opening the link with a new browser.
 
 Useful guest commands:
 
@@ -198,7 +199,7 @@ From the repo root or from a packaged guest bundle:
 powershell -ExecutionPolicy Bypass -File .\scripts\install-guest.ps1
 ```
 
-The guest installer writes the config to `%LOCALAPPDATA%\URLBridge\config.yaml` by default and registers the Windows URL handler with an explicit `--config` argument. It keeps any existing `browser_path` value and uses a 3-second host timeout unless you override it. You can still pass `-HostUrl`, `-Token`, or `-ConfigPath` if you prefer a fully explicit setup.
+The guest installer writes the config to `%LOCALAPPDATA%\URLBridge\config.yaml` by default and registers the Windows URL handler with an explicit `--config` argument. It keeps any existing `browser_path` value and uses a 3-second host timeout unless you override it. If `browser_path` is still empty, the first real local-browser fallback will detect and cache one automatically. You can still pass `-HostUrl`, `-Token`, or `-ConfigPath` if you prefer a fully explicit setup.
 
 ## Current limitations
 

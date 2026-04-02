@@ -18,7 +18,7 @@ func ForwardURL(rawURL, configPath string) error {
 }
 
 func ForwardURLWithNotice(rawURL, configPath string, notify func(string)) error {
-	cfg, _, err := LoadConfig(configPath)
+	cfg, resolvedConfigPath, err := LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
@@ -34,7 +34,7 @@ func ForwardURLWithNotice(rawURL, configPath string, notify func(string)) error 
 	}
 
 	return handleHostForwardFailure(failure, notify, func() error {
-		return OpenLocalBrowser(targetURL, cfg.BrowserPath)
+		return OpenLocalBrowser(targetURL, cfg, resolvedConfigPath, notify)
 	})
 }
 

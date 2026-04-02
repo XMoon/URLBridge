@@ -15,14 +15,23 @@ func OpenDefaultAppsSettings() error {
 }
 
 func ShowErrorDialog(title, message string) {
+	showDialog(title, message, 0x00000010)
+}
+
+func ShowYesNoDialog(title, message string) bool {
+	return showDialog(title, message, 0x00000024) == 6
+}
+
+func showDialog(title, message string, flags uintptr) uintptr {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	messageBox := user32.NewProc("MessageBoxW")
-	_, _, _ = messageBox.Call(
+	result, _, _ := messageBox.Call(
 		0,
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(message))),
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title))),
-		0x00000010,
+		flags,
 	)
+	return result
 }
 
 func UnsupportedArgumentError(raw string) error {
