@@ -111,7 +111,7 @@ browser_path: "C:/Program Files/Google/Chrome/Application/chrome.exe" # 可选
 - 宿主端日志始终会输出到 stdout，默认还会额外写入文件；如需关闭文件日志，可设 `log_path: ""`。
 - 宿主端默认日志路径分别是：Windows 的 `%LOCALAPPDATA%\URLBridgeHost\host.log`，Linux 的 `$XDG_STATE_HOME/urlbridge/host.log` 或 `~/.local/state/urlbridge/host.log`，macOS 的 `~/Library/Logs/URLBridge/host.log`。
 - Linux 上会优先使用 `xdg-open`，然后回退到 `gio open`。
-- macOS 上使用 `open`，Windows 上使用 `rundll32 url.dll,FileProtocolHandler`。
+- macOS 上使用 `open`，Windows 上使用系统默认的 URL 处理器。
 
 ### 宿主机安装脚本
 

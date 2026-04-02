@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -108,7 +107,7 @@ func Uninstall() error {
 	notifyAssociationChanged()
 
 	if len(errs) > 0 {
-		return fmt.Errorf(strings.Join(errs, "; "))
+		return errors.New(strings.Join(errs, "; "))
 	}
 
 	return nil
@@ -268,42 +267,34 @@ func bridgeDescription(scheme string) string {
 }
 
 func regAdd(path, valueName, valueType, data string) error {
-	args := []string{"add", path, "/f", "/t", valueType}
-	if valueName == "" {
-		args = append(args, "/ve")
-	} else {
-		args = append(args, "/v", valueName)
+	if !strings.EqualFold(strings.TrimSpace(valueType), "REG_SZ") {
+		return fmt.Errorf("reg add %s: unsupported registry type %q", path, valueType)
 	}
-	args = append(args, "/d", data)
 
-	output, err := exec.Command("reg", args...).CombinedOutput()
+	err := writeRegistryStringValue(path, valueName, data)
 	if err != nil {
-		return fmt.Errorf("reg add %s: %w: %s", path, err, strings.TrimSpace(string(output)))
+		return fmt.Errorf("reg add %s: %w", path, err)
 	}
 
 	return nil
 }
 
 func regDeleteTree(path string) error {
-	output, err := exec.Command("reg", "delete", path, "/f").CombinedOutput()
-	if err != nil {
-		text := strings.TrimSpace(string(output))
-		if strings.Contains(strings.ToLower(text), "unable to find") {
+	if err := deleteRegistryTree(path); err != nil {
+		if errorsIsRegistryNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("reg delete %s: %w: %s", path, err, text)
+		return fmt.Errorf("reg delete %s: %w", path, err)
 	}
 	return nil
 }
 
 func regDeleteValue(path, valueName string) error {
-	output, err := exec.Command("reg", "delete", path, "/f", "/v", valueName).CombinedOutput()
-	if err != nil {
-		text := strings.TrimSpace(string(output))
-		if strings.Contains(strings.ToLower(text), "unable to find") {
+	if err := deleteRegistryValue(path, valueName); err != nil {
+		if errorsIsRegistryNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("reg delete value %s/%s: %w: %s", path, valueName, err, text)
+		return fmt.Errorf("reg delete value %s/%s: %w", path, valueName, err)
 	}
 	return nil
 }

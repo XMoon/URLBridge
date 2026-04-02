@@ -4,14 +4,14 @@ package guest
 
 import (
 	"fmt"
-	"os/exec"
 	"syscall"
 	"unsafe"
+
+	"github.com/xmoon/urlbridge/internal/winutil"
 )
 
 func OpenDefaultAppsSettings() error {
-	target := "ms-settings:defaultapps"
-	return exec.Command("cmd", "/c", "start", "", target).Start()
+	return winutil.ShellOpen("ms-settings:defaultapps")
 }
 
 func ShowErrorDialog(title, message string) {

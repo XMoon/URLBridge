@@ -93,21 +93,14 @@ func commonBrowserInstallPaths(vendor, product, executable string) []string {
 }
 
 func readAppPathFromRegistry(key string) (string, error) {
-	output, err := exec.Command("reg", "query", key, "/ve").CombinedOutput()
+	path, err := readRegistryStringValue(key, "")
 	if err != nil {
 		return "", err
 	}
-
-	for _, line := range strings.Split(strings.ReplaceAll(string(output), "\r\n", "\n"), "\n") {
-		fields := strings.Fields(line)
-		for idx, field := range fields {
-			if strings.HasPrefix(field, "REG_") && idx+1 < len(fields) {
-				return strings.Join(fields[idx+1:], " "), nil
-			}
-		}
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("registry key %s did not contain an executable path", key)
 	}
-
-	return "", fmt.Errorf("registry key %s did not contain an executable path", key)
+	return path, nil
 }
 
 func startBrowserProcess(browserPath, targetURL string) error {

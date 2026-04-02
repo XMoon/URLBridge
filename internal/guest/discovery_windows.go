@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os/exec"
-	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -265,32 +263,6 @@ func probeCandidate(baseURL string, timeout time.Duration) (DiscoveryCandidate, 
 		HostName:      health.HostName,
 		TokenRequired: health.TokenRequired,
 	}, nil
-}
-
-func defaultGatewayURLs() []string {
-	output, err := exec.Command(
-		"powershell.exe",
-		"-NoProfile",
-		"-NonInteractive",
-		"-Command",
-		"$g = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | ForEach-Object { $_.IPv4DefaultGateway.NextHop }; $g | Sort-Object -Unique",
-	).Output()
-	if err != nil {
-		return nil
-	}
-
-	lines := strings.Split(strings.ReplaceAll(string(output), "\r\n", "\n"), "\n")
-	var urls []string
-	for _, line := range lines {
-		ip := strings.TrimSpace(line)
-		if ip == "" || net.ParseIP(ip) == nil {
-			continue
-		}
-		urls = append(urls, formatCandidateBaseURL(ip, bridge.DefaultPort))
-	}
-
-	sort.Strings(urls)
-	return urls
 }
 
 func commonNATHostURLs() []string {

@@ -113,7 +113,7 @@ Notes:
 - Host logs always go to stdout, and by default also to a file. Set `log_path: ""` to disable file logging.
 - Default host log paths are `%LOCALAPPDATA%\URLBridgeHost\host.log` on Windows, `$XDG_STATE_HOME/urlbridge/host.log` or `~/.local/state/urlbridge/host.log` on Linux, and `~/Library/Logs/URLBridge/host.log` on macOS.
 - On Linux, URL Bridge uses `xdg-open`, then falls back to `gio open`.
-- On macOS it uses `open`, and on Windows it uses `rundll32 url.dll,FileProtocolHandler`.
+- On macOS it uses `open`, and on Windows it uses the Windows shell/default URL handler.
 
 ### Host install scripts
 

@@ -1,19 +1,59 @@
 package host
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestBrowserCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		goos    string
-		want    string
-		wantErr bool
+		name     string
+		goos     string
+		lookPath func(string) (string, error)
+		want     string
+		wantArgs []string
+		wantErr  bool
 	}{
-		{name: "windows", goos: "windows", want: "rundll32.exe"},
-		{name: "darwin", goos: "darwin", want: "open"},
-		{name: "unsupported", goos: "plan9", wantErr: true},
+		{
+			name:     "darwin",
+			goos:     "darwin",
+			want:     "open",
+			wantArgs: []string{"https://example.com"},
+		},
+		{
+			name: "linux xdg-open",
+			goos: "linux",
+			lookPath: func(name string) (string, error) {
+				if name == "xdg-open" {
+					return "/usr/bin/xdg-open", nil
+				}
+				return "", errors.New("not found")
+			},
+			want:     "xdg-open",
+			wantArgs: []string{"https://example.com"},
+		},
+		{
+			name: "linux gio fallback",
+			goos: "linux",
+			lookPath: func(name string) (string, error) {
+				if name == "gio" {
+					return "/usr/bin/gio", nil
+				}
+				return "", errors.New("not found")
+			},
+			want:     "gio",
+			wantArgs: []string{"open", "https://example.com"},
+		},
+		{
+			name: "unsupported",
+			goos: "plan9",
+			lookPath: func(string) (string, error) {
+				return "", errors.New("not found")
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -21,7 +61,12 @@ func TestBrowserCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, _, err := browserCommand(tt.goos, "https://example.com")
+			lookPath := tt.lookPath
+			if lookPath == nil {
+				lookPath = func(string) (string, error) { return "", errors.New("not found") }
+			}
+
+			got, gotArgs, err := browserCommandWithLookPath(tt.goos, "https://example.com", lookPath)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error")
@@ -35,6 +80,14 @@ func TestBrowserCommand(t *testing.T) {
 
 			if got != tt.want {
 				t.Fatalf("got %q want %q", got, tt.want)
+			}
+			if len(gotArgs) != len(tt.wantArgs) {
+				t.Fatalf("args got %v want %v", gotArgs, tt.wantArgs)
+			}
+			for idx := range tt.wantArgs {
+				if gotArgs[idx] != tt.wantArgs[idx] {
+					t.Fatalf("args got %v want %v", gotArgs, tt.wantArgs)
+				}
 			}
 		})
 	}
