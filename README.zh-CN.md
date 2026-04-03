@@ -72,6 +72,7 @@ listen_addr: "0.0.0.0:38495"
 token: "YOUR_TOKEN"
 discovery: true
 log_path: "/path/to/host.log" # 可选；设为 "" 可关闭文件日志
+log_full_urls: false # 可选；默认会在日志里去掉 query 和 fragment
 ```
 
 访客端配置示例：
@@ -109,6 +110,7 @@ browser_path: "C:/Program Files/Google/Chrome/Application/chrome.exe" # 可选
 - 服务会根据宿主机的 IPv4 网卡打印可供访客端使用的候选 URL。
 - 默认会启用 UDP `38496` 上的自动发现；如需关闭，可传 `--discovery=false`。
 - 宿主端日志始终会输出到 stdout，默认还会额外写入文件；如需关闭文件日志，可设 `log_path: ""`。
+- 宿主端日志默认会去掉 URL 里的账号信息、query 和 fragment；只有在明确需要排查问题时，才建议设置 `log_full_urls: true` 记录完整 URL。
 - 宿主端默认日志路径分别是：Windows 的 `%LOCALAPPDATA%\URLBridgeHost\host.log`，Linux 的 `$XDG_STATE_HOME/urlbridge/host.log` 或 `~/.local/state/urlbridge/host.log`，macOS 的 `~/Library/Logs/URLBridge/host.log`。
 - Linux 上会优先使用 `xdg-open`，然后回退到 `gio open`。
 - macOS 上使用 `open`，Windows 上使用系统默认的 URL 处理器。

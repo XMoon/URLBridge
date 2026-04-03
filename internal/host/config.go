@@ -13,10 +13,11 @@ import (
 const ConfigFileName = "config.yaml"
 
 type FileConfig struct {
-	ListenAddr string         `yaml:"listen_addr"`
-	Token      string         `yaml:"token,omitempty"`
-	Discovery  bool           `yaml:"discovery"`
-	LogPath    OptionalString `yaml:"log_path,omitempty"`
+	ListenAddr  string         `yaml:"listen_addr"`
+	Token       string         `yaml:"token,omitempty"`
+	Discovery   bool           `yaml:"discovery"`
+	LogPath     OptionalString `yaml:"log_path,omitempty"`
+	LogFullURLs bool           `yaml:"log_full_urls,omitempty"`
 }
 
 func DefaultFileConfig() FileConfig {

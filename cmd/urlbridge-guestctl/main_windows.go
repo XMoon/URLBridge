@@ -3,10 +3,12 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/xmoon/urlbridge/internal/guest"
@@ -43,14 +45,15 @@ func main() {
 }
 
 func install(args []string) {
-	fs := flag.NewFlagSet("install", flag.ExitOnError)
-	fs.SetOutput(io.Discard)
+	fs, parseOutput := newCommandFlagSet("install")
 	configPath := fs.String("config", "", "path to config.yaml")
 	hostURL := fs.String("host-url", "", "base URL of the host service, e.g. http://10.0.2.2:38495")
 	token := fs.String("token", "", "optional shared secret expected by the host")
 	noOpenSettings := fs.Bool("no-open-settings", false, "do not open the Windows Default Apps page after registration")
 	timeout := fs.Int("timeout", 0, "HTTP timeout in seconds")
-	fs.Parse(args)
+	if !parseCommandFlags(fs, parseOutput, args, installUsage) {
+		return
+	}
 
 	cfg, resolvedConfigPath, err := guest.LoadConfigForInstall(*configPath)
 	if err != nil {
@@ -107,11 +110,12 @@ func install(args []string) {
 }
 
 func discover(args []string) {
-	fs := flag.NewFlagSet("discover", flag.ExitOnError)
-	fs.SetOutput(io.Discard)
+	fs, parseOutput := newCommandFlagSet("discover")
 	configPath := fs.String("config", "", "path to config.yaml")
 	timeout := fs.Int("timeout", 0, "discovery timeout in seconds")
-	fs.Parse(args)
+	if !parseCommandFlags(fs, parseOutput, args, discoverUsage) {
+		return
+	}
 
 	cfgState, err := guest.LoadConfigState(*configPath)
 	if err != nil {
@@ -143,10 +147,11 @@ func discover(args []string) {
 }
 
 func status(args []string) {
-	fs := flag.NewFlagSet("status", flag.ExitOnError)
-	fs.SetOutput(io.Discard)
+	fs, parseOutput := newCommandFlagSet("status")
 	configPath := fs.String("config", "", "path to config.yaml")
-	fs.Parse(args)
+	if !parseCommandFlags(fs, parseOutput, args, statusUsage) {
+		return
+	}
 
 	cfg, resolvedConfigPath, err := guest.LoadConfig(*configPath)
 	if err != nil {
@@ -182,6 +187,21 @@ Usage:
   urlbridge-guestctl.exe uninstall`)
 }
 
+func installUsage() {
+	fmt.Println(`Usage:
+  urlbridge-guestctl.exe install [--config PATH] [--host-url http://HOST:38495] [--token TOKEN] [--timeout SECONDS] [--no-open-settings]`)
+}
+
+func discoverUsage() {
+	fmt.Println(`Usage:
+  urlbridge-guestctl.exe discover [--config PATH] [--timeout SECONDS]`)
+}
+
+func statusUsage() {
+	fmt.Println(`Usage:
+  urlbridge-guestctl.exe status [--config PATH]`)
+}
+
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
@@ -193,4 +213,33 @@ func visitedFlags(fs *flag.FlagSet) map[string]bool {
 		visited[f.Name] = true
 	})
 	return visited
+}
+
+func newCommandFlagSet(name string) (*flag.FlagSet, *bytes.Buffer) {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.Usage = func() {}
+
+	var output bytes.Buffer
+	fs.SetOutput(&output)
+	return fs, &output
+}
+
+func parseCommandFlags(fs *flag.FlagSet, output *bytes.Buffer, args []string, usage func()) bool {
+	err := fs.Parse(args)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, flag.ErrHelp) {
+		usage()
+		return false
+	}
+
+	message := strings.TrimSpace(output.String())
+	if message == "" {
+		message = err.Error()
+	}
+	fmt.Fprintln(os.Stderr, message)
+	usage()
+	os.Exit(2)
+	return false
 }

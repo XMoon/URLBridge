@@ -57,10 +57,11 @@ func run() error {
 	}
 
 	if err := host.Serve(ctx, host.Config{
-		ListenAddr: cfg.FileConfig.ListenAddr,
-		Token:      cfg.FileConfig.Token,
-		Discovery:  cfg.FileConfig.Discovery,
-		Logger:     logger,
+		ListenAddr:  cfg.FileConfig.ListenAddr,
+		Token:       cfg.FileConfig.Token,
+		Discovery:   cfg.FileConfig.Discovery,
+		LogFullURLs: cfg.FileConfig.LogFullURLs,
+		Logger:      logger,
 	}); err != nil {
 		return err
 	}

@@ -4,12 +4,10 @@ package guest
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/xmoon/urlbridge/internal/bridge"
 )
@@ -257,36 +255,4 @@ func endpointURL(baseURL, path string) (string, error) {
 	}
 
 	return base.ResolveReference(rel).String(), nil
-}
-
-func HealthCheck(cfg Config) error {
-	if err := cfg.NormalizeForRuntime(); err != nil {
-		return err
-	}
-
-	client := &http.Client{Timeout: time.Duration(cfg.RequestTimeoutSeconds) * time.Second}
-	target, err := endpointURL(cfg.HostBaseURL, "/healthz")
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, target, nil)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	if cfg.Token != "" {
-		req.Header.Set("X-URLBridge-Token", cfg.Token)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("reach host: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("host returned %s", resp.Status)
-	}
-
-	return nil
 }

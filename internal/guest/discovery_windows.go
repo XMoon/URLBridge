@@ -3,11 +3,14 @@
 package guest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -77,6 +80,8 @@ func DiscoverHosts(timeout time.Duration) ([]DiscoveryCandidate, error) {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
+	start := time.Now()
+	deadline := start.Add(timeout)
 
 	seen := map[string]DiscoveryCandidate{}
 	var ordered []string
@@ -92,24 +97,11 @@ func DiscoverHosts(timeout time.Duration) ([]DiscoveryCandidate, error) {
 		ordered = append(ordered, candidate.BaseURL)
 	}
 
-	udpTimeout := timeout / 2
-	if udpTimeout < 1500*time.Millisecond {
-		udpTimeout = 1500 * time.Millisecond
-	}
-	if udpTimeout > timeout {
-		udpTimeout = timeout
-	}
-
-	for _, candidate := range discoverViaUDP(udpTimeout) {
+	for _, candidate := range resolveUDPDiscoveryTargets(deadline, discoverViaUDP(udpDiscoveryDeadline(start, timeout))) {
 		record(candidate)
 	}
 
-	probeTimeout := timeout / 4
-	if probeTimeout < 1200*time.Millisecond {
-		probeTimeout = 1200 * time.Millisecond
-	}
-
-	for _, candidate := range discoverViaProbes(probeTimeout) {
+	for _, candidate := range discoverViaProbes(deadline) {
 		record(candidate)
 	}
 
@@ -125,7 +117,16 @@ func DiscoverHosts(timeout time.Duration) ([]DiscoveryCandidate, error) {
 	return results, nil
 }
 
-func discoverViaUDP(timeout time.Duration) []DiscoveryCandidate {
+type udpDiscoveryTarget struct {
+	BaseURLs []string
+	HostName string
+}
+
+func discoverViaUDP(deadline time.Time) []udpDiscoveryTarget {
+	if remainingUntil(deadline) <= 0 {
+		return nil
+	}
+
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
 		return nil
@@ -145,9 +146,8 @@ func discoverViaUDP(timeout time.Duration) []DiscoveryCandidate {
 		return nil
 	}
 
-	var results []DiscoveryCandidate
+	var results []udpDiscoveryTarget
 	buffer := make([]byte, 64*1024)
-	deadline := time.Now().Add(timeout)
 
 	for {
 		if err := conn.SetReadDeadline(deadline); err != nil {
@@ -167,34 +167,55 @@ func discoverViaUDP(timeout time.Duration) []DiscoveryCandidate {
 			continue
 		}
 
-		baseURL := formatCandidateBaseURL(addr.IP.String(), resp.HTTPPort)
-		candidate, err := probeCandidate(baseURL, timeout)
-		if err != nil {
-			for _, alternate := range resp.CandidateBaseURLs {
-				candidate, err = probeCandidate(alternate, timeout)
-				if err == nil {
-					candidate.Source = "udp-broadcast"
-					if candidate.HostName == "" {
-						candidate.HostName = resp.HostName
-					}
-					results = append(results, candidate)
-					break
-				}
-			}
-			continue
-		}
-
-		candidate.Source = "udp-broadcast"
-		if candidate.HostName == "" {
-			candidate.HostName = resp.HostName
-		}
-		results = append(results, candidate)
+		results = append(results, udpDiscoveryTarget{
+			BaseURLs: orderedCandidateBaseURLs(
+				formatCandidateBaseURL(addr.IP.String(), resp.HTTPPort),
+				resp.CandidateBaseURLs,
+			),
+			HostName: resp.HostName,
+		})
 	}
 
 	return results
 }
 
-func discoverViaProbes(timeout time.Duration) []DiscoveryCandidate {
+func resolveUDPDiscoveryTargets(deadline time.Time, targets []udpDiscoveryTarget) []DiscoveryCandidate {
+	if len(targets) == 0 || remainingUntil(deadline) <= 0 {
+		return nil
+	}
+
+	results := make([]probeResult, len(targets))
+	var wg sync.WaitGroup
+	for idx, target := range targets {
+		wg.Add(1)
+		go func(idx int, target udpDiscoveryTarget) {
+			defer wg.Done()
+
+			ctx, cancel := context.WithDeadline(context.Background(), deadline)
+			defer cancel()
+
+			for _, baseURL := range target.BaseURLs {
+				candidate, err := probeCandidate(ctx, baseURL)
+				if err == nil {
+					candidate.Source = "udp-broadcast"
+					if candidate.HostName == "" {
+						candidate.HostName = target.HostName
+					}
+					results[idx] = probeResult{Candidate: candidate, OK: true}
+					return
+				}
+				if ctx.Err() != nil {
+					return
+				}
+			}
+		}(idx, target)
+	}
+	wg.Wait()
+
+	return orderedProbeResults(results)
+}
+
+func discoverViaProbes(deadline time.Time) []DiscoveryCandidate {
 	var urls []probeTarget
 	for _, baseURL := range commonNATHostURLs() {
 		urls = append(urls, probeTarget{BaseURL: baseURL, Source: "vm-nat"})
@@ -203,23 +224,7 @@ func discoverViaProbes(timeout time.Duration) []DiscoveryCandidate {
 		urls = append(urls, probeTarget{BaseURL: baseURL, Source: "default-gateway"})
 	}
 
-	seen := map[string]struct{}{}
-	var results []DiscoveryCandidate
-	for _, target := range urls {
-		if _, exists := seen[target.BaseURL]; exists {
-			continue
-		}
-		seen[target.BaseURL] = struct{}{}
-
-		candidate, err := probeCandidate(target.BaseURL, timeout)
-		if err != nil {
-			continue
-		}
-		candidate.Source = target.Source
-		results = append(results, candidate)
-	}
-
-	return results
+	return probeTargetsWithinDeadline(deadline, dedupeProbeTargets(urls))
 }
 
 type probeTarget struct {
@@ -227,35 +232,125 @@ type probeTarget struct {
 	Source  string
 }
 
-func probeCandidate(baseURL string, timeout time.Duration) (DiscoveryCandidate, error) {
+type probeResult struct {
+	Candidate DiscoveryCandidate
+	OK        bool
+}
+
+func probeTargetsWithinDeadline(deadline time.Time, targets []probeTarget) []DiscoveryCandidate {
+	if len(targets) == 0 || remainingUntil(deadline) <= 0 {
+		return nil
+	}
+
+	results := make([]probeResult, len(targets))
+	var wg sync.WaitGroup
+	for idx, target := range targets {
+		wg.Add(1)
+		go func(idx int, target probeTarget) {
+			defer wg.Done()
+
+			ctx, cancel := context.WithDeadline(context.Background(), deadline)
+			defer cancel()
+
+			candidate, err := probeCandidate(ctx, target.BaseURL)
+			if err != nil {
+				return
+			}
+			candidate.Source = target.Source
+			results[idx] = probeResult{Candidate: candidate, OK: true}
+		}(idx, target)
+	}
+	wg.Wait()
+
+	return orderedProbeResults(results)
+}
+
+func orderedProbeResults(results []probeResult) []DiscoveryCandidate {
+	ordered := make([]DiscoveryCandidate, 0, len(results))
+	for _, result := range results {
+		if !result.OK {
+			continue
+		}
+		ordered = append(ordered, result.Candidate)
+	}
+	return ordered
+}
+
+func dedupeProbeTargets(targets []probeTarget) []probeTarget {
+	seen := make(map[string]struct{}, len(targets))
+	ordered := make([]probeTarget, 0, len(targets))
+
+	for _, target := range targets {
+		if _, exists := seen[target.BaseURL]; exists {
+			continue
+		}
+		seen[target.BaseURL] = struct{}{}
+		ordered = append(ordered, target)
+	}
+
+	return ordered
+}
+
+func orderedCandidateBaseURLs(primary string, alternates []string) []string {
+	ordered := make([]string, 0, len(alternates)+1)
+	seen := make(map[string]struct{}, len(alternates)+1)
+
+	for _, candidate := range append([]string{primary}, alternates...) {
+		trimmed := strings.TrimSpace(candidate)
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		ordered = append(ordered, trimmed)
+	}
+
+	return ordered
+}
+
+func udpDiscoveryDeadline(start time.Time, timeout time.Duration) time.Time {
+	budget := timeout / 2
+	if budget > 1500*time.Millisecond {
+		budget = 1500 * time.Millisecond
+	}
+	if budget <= 0 || budget > timeout {
+		budget = timeout
+	}
+	return start.Add(budget)
+}
+
+func remainingUntil(deadline time.Time) time.Duration {
+	return time.Until(deadline)
+}
+
+func probeCandidate(ctx context.Context, baseURL string) (DiscoveryCandidate, error) {
 	target, err := endpointURL(baseURL, "/healthz")
 	if err != nil {
 		return DiscoveryCandidate{}, err
 	}
 
-	client := &http.Client{Timeout: timeout}
-	req, err := http.NewRequest(http.MethodGet, target, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return DiscoveryCandidate{}, fmt.Errorf("create probe request: %w", err)
 	}
 
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return DiscoveryCandidate{}, fmt.Errorf("probe host: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return DiscoveryCandidate{}, fmt.Errorf("probe host returned %s", resp.Status)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024))
+	if err != nil {
+		return DiscoveryCandidate{}, fmt.Errorf("read health response: %w", err)
 	}
 
-	var health bridge.HealthResponse
-	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
-		return DiscoveryCandidate{}, fmt.Errorf("decode health response: %w", err)
-	}
-
-	if !health.OK || health.Name != bridge.AppName {
-		return DiscoveryCandidate{}, fmt.Errorf("unexpected health response")
+	health, err := parseHealthResponse(resp.StatusCode, body)
+	if err != nil {
+		return DiscoveryCandidate{}, err
 	}
 
 	return DiscoveryCandidate{

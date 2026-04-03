@@ -34,6 +34,16 @@ type HealthResponse struct {
 	TokenRequired bool   `json:"token_required,omitempty"`
 }
 
+type ProbeResponse struct {
+	OK            bool   `json:"ok"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
+	HostName      string `json:"host_name,omitempty"`
+	TokenRequired bool   `json:"token_required,omitempty"`
+	Authenticated bool   `json:"authenticated,omitempty"`
+	Message       string `json:"message,omitempty"`
+}
+
 type DiscoveryRequest struct {
 	App string `json:"app"`
 }

@@ -78,6 +78,8 @@ $runnerScript = Join-Path $installDir "start-host.ps1"
 $discovery = "true"
 $hasExistingLogPath = $false
 $existingLogPath = ""
+$hasExistingLogFullUrls = $false
+$existingLogFullUrls = "false"
 
 if (-not $ConfigPath) {
     $ConfigPath = Join-Path $installDir "config.yaml"
@@ -110,6 +112,11 @@ if (Test-Path $ConfigPath) {
         $existingLogPath = Get-YamlScalar -Path $ConfigPath -Key "log_path"
         $hasExistingLogPath = $true
     }
+
+    if (Select-String -Path $ConfigPath -Pattern "^\s*log_full_urls:\s*" -Quiet) {
+        $existingLogFullUrls = Normalize-BoolValue (Get-YamlScalar -Path $ConfigPath -Key "log_full_urls")
+        $hasExistingLogFullUrls = $true
+    }
 }
 
 if (-not $Token) {
@@ -125,6 +132,9 @@ $configLines = @(
 )
 if ($hasExistingLogPath) {
     $configLines += "log_path: $(ConvertTo-YamlSingleQuoted $existingLogPath)"
+}
+if ($hasExistingLogFullUrls) {
+    $configLines += "log_full_urls: $existingLogFullUrls"
 }
 $configContent = ($configLines -join "`r`n") + "`r`n"
 Set-Content -Path $ConfigPath -Value $configContent -Encoding ASCII

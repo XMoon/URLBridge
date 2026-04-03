@@ -74,6 +74,7 @@ listen_addr: "0.0.0.0:38495"
 token: "YOUR_TOKEN"
 discovery: true
 log_path: "/path/to/host.log" # optional; use "" to disable file logging
+log_full_urls: false # optional; default redacts query strings and fragments in logs
 ```
 
 Example guest config:
@@ -111,6 +112,7 @@ Notes:
 - The service prints candidate host URLs based on the host machine's IPv4 interfaces.
 - Discovery is enabled by default on UDP `38496`; disable it with `--discovery=false`.
 - Host logs always go to stdout, and by default also to a file. Set `log_path: ""` to disable file logging.
+- Host logs redact URL credentials, query strings, and fragments by default. Set `log_full_urls: true` only when you explicitly need full URL logging for debugging.
 - Default host log paths are `%LOCALAPPDATA%\URLBridgeHost\host.log` on Windows, `$XDG_STATE_HOME/urlbridge/host.log` or `~/.local/state/urlbridge/host.log` on Linux, and `~/Library/Logs/URLBridge/host.log` on macOS.
 - On Linux, URL Bridge uses `xdg-open`, then falls back to `gio open`.
 - On macOS it uses `open`, and on Windows it uses the Windows shell/default URL handler.

@@ -55,6 +55,18 @@ func TestLoadFileConfigLogPathModes(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "full urls enabled",
+			configYAML: "listen_addr: '127.0.0.1:38495'\n" +
+				"discovery: true\n" +
+				"log_full_urls: true\n",
+			assert: func(t *testing.T, cfg FileConfig) {
+				t.Helper()
+				if !cfg.LogFullURLs {
+					t.Fatalf("expected log_full_urls=true")
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

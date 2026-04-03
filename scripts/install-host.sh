@@ -15,6 +15,8 @@ NO_AUTOSTART=0
 DISCOVERY="true"
 LOG_PATH=""
 LOG_PATH_PRESENT=0
+LOG_FULL_URLS="false"
+LOG_FULL_URLS_PRESENT=0
 
 usage() {
   cat <<'EOF'
@@ -191,6 +193,11 @@ if [[ -f "$CONFIG_PATH" ]]; then
     LOG_PATH="$(read_yaml_value "log_path" "$CONFIG_PATH")"
     LOG_PATH_PRESENT=1
   fi
+
+  if read_yaml_value "log_full_urls" "$CONFIG_PATH" >/dev/null; then
+    LOG_FULL_URLS="$(normalize_bool "$(read_yaml_value "log_full_urls" "$CONFIG_PATH")")"
+    LOG_FULL_URLS_PRESENT=1
+  fi
 fi
 
 if [[ -z "$TOKEN" ]]; then
@@ -211,6 +218,10 @@ EOF
 if [[ "$LOG_PATH_PRESENT" -eq 1 ]]; then
   LOG_PATH_YAML="$(yaml_quote "$LOG_PATH")"
   printf "log_path: '%s'\n" "$LOG_PATH_YAML" >>"$CONFIG_PATH"
+fi
+
+if [[ "$LOG_FULL_URLS_PRESENT" -eq 1 ]]; then
+  printf "log_full_urls: %s\n" "$LOG_FULL_URLS" >>"$CONFIG_PATH"
 fi
 
 INSTALLED_BINARY_Q="$(printf '%q' "$INSTALLED_BINARY")"
