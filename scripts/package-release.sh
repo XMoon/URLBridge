@@ -126,4 +126,18 @@ stage_bundle \
   "$SCRIPT_DIR/install-guest.ps1" "install-guest.ps1" \
   "$README_FILE" "README.md"
 
+stage_bundle \
+  "urlbridge-guest-linux-amd64" "tar.gz" \
+  "$DIST_DIR/urlbridge-browser-linux-amd64" "urlbridge-browser" \
+  "$DIST_DIR/urlbridge-guestctl-linux-amd64" "urlbridge-guestctl" \
+  "$SCRIPT_DIR/install-guest.sh" "install-guest.sh" \
+  "$README_FILE" "README.md"
+
+stage_bundle \
+  "urlbridge-guest-linux-arm64" "tar.gz" \
+  "$DIST_DIR/urlbridge-browser-linux-arm64" "urlbridge-browser" \
+  "$DIST_DIR/urlbridge-guestctl-linux-arm64" "urlbridge-guestctl" \
+  "$SCRIPT_DIR/install-guest.sh" "install-guest.sh" \
+  "$README_FILE" "README.md"
+
 echo "Created release bundles under $PACKAGE_DIR"

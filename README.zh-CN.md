@@ -2,13 +2,13 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-URL Bridge 可以把 Windows 10/11 虚拟机变成一个轻量级的浏览器桥接器：当虚拟机里的代码工具、聊天工具、文档或其他应用打开 `http://` 或 `https://` 链接时，URL 会被转发给宿主机上的服务，再由宿主机的默认浏览器打开。
+URL Bridge 可以把 Windows 或 Linux 虚拟机变成一个轻量级的浏览器桥接器：当虚拟机里的代码工具、聊天工具、文档或其他应用打开 `http://` 或 `https://` 链接时，URL 会被转发给宿主机上的服务，再由宿主机的默认浏览器打开。
 
 ## 仓库内容
 
 - `urlbridge-host`：运行在宿主机上的跨平台服务，支持 Windows、Linux 和 macOS。
-- `urlbridge-browser.exe`：Windows URL 处理器，用于注册 `http` 和 `https`。
-- `urlbridge-guestctl.exe`：Windows 侧辅助工具，用于安装、状态检查和卸载访客端集成。
+- `urlbridge-browser`：访客端 URL 处理器，用于注册 `http` 和 `https`。
+- `urlbridge-guestctl`：访客端辅助工具，用于安装、状态检查和卸载访客端集成。
 
 ## 为什么有两个 Windows 二进制
 
@@ -17,17 +17,16 @@ URL Bridge 可以把 Windows 10/11 虚拟机变成一个轻量级的浏览器桥
 ## 工作方式
 
 1. 在宿主机上运行 `urlbridge-host`。
-2. 在 Windows 虚拟机内运行 `urlbridge-guestctl.exe install`，可以显式传入 `--host-url`，如果宿主机开启了鉴权，也可以额外传入 `--token`。
-3. Windows 会打开默认应用设置页。
-4. 将 `HTTP` 和 `HTTPS` 的处理程序设置为 `URL Bridge`。
-5. 之后在虚拟机内点击 URL 时，请求会发送给宿主机服务，并由宿主机浏览器打开。
+2. 在虚拟机内运行 `urlbridge-guestctl install`，可以显式传入 `--host-url`，如果宿主机开启了鉴权，也可以额外传入 `--token`。
+3. Windows 访客端需要在默认应用里将 `HTTP` 和 `HTTPS` 设置为 `URL Bridge`；Linux 访客端会在安装时自动注册为 `xdg-open` 处理器。
+4. 之后在虚拟机内点击 URL 时，请求会发送给宿主机服务，并由宿主机浏览器打开。
 
 ## 自动发现
 
 URL Bridge 支持访客端自动发现宿主机：
 
 - 宿主机可以在 UDP `38496` 端口响应发现请求。
-- Windows 访客端还会探测常见虚拟机宿主地址，例如 `10.0.2.2`、`10.0.3.2`，以及当前默认网关。
+- Windows 和 Linux 访客端还会探测常见虚拟机宿主地址，例如 `10.0.2.2`、`10.0.3.2`，以及当前默认网关。
 
 ## Windows 侧的重要行为说明
 
@@ -37,6 +36,10 @@ URL Bridge 支持访客端自动发现宿主机：
 
 - <https://learn.microsoft.com/en-us/windows/win32/shell/default-programs>
 - <https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-default-apps-settings>
+
+## Linux 侧的重要行为说明
+
+在 Linux 访客端上，URL Bridge 会写入用户级 desktop entry，并把它注册为 `x-scheme-handler/http` 和 `x-scheme-handler/https`，这样 `xdg-open` 就可以把链接派发给 URL Bridge。如果系统没有 `xdg-mime`，会直接更新用户级 `mimeapps.list`。
 
 ## 构建
 
@@ -50,7 +53,7 @@ make build-all
 
 ## 配置文件
 
-URL Bridge 现在支持宿主端和 Windows 访客端都使用 `config.yaml`。在没有显式传入 `--config PATH` 时，会按下面顺序查找配置文件：
+URL Bridge 现在支持宿主端和访客端都使用 `config.yaml`。在没有显式传入 `--config PATH` 时，会按下面顺序查找配置文件：
 
 1. 当前工作目录
 2. 可执行文件所在目录
@@ -61,6 +64,7 @@ URL Bridge 现在支持宿主端和 Windows 访客端都使用 `config.yaml`。�
 - Windows 宿主端：`%LOCALAPPDATA%\URLBridgeHost\config.yaml`
 - Windows 访客端：`%LOCALAPPDATA%\URLBridge\config.yaml`
 - Linux 宿主端：`$XDG_CONFIG_HOME/urlbridge/config.yaml`，未设置时回退到 `~/.config/urlbridge/config.yaml`，最后再查 `/etc/urlbridge/config.yaml`
+- Linux 访客端：`$XDG_CONFIG_HOME/urlbridge-guest/config.yaml`，未设置时回退到 `~/.config/urlbridge-guest/config.yaml`
 - macOS 宿主端：`~/Library/Application Support/URLBridge/config.yaml`，然后是 `/etc/urlbridge/config.yaml`
 
 配置优先级固定为：内建默认值，其次 `config.yaml`，最后是命令行里显式传入的参数。
@@ -141,6 +145,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-host.ps1
 
 ## 访客端使用方式
 
+### Windows 访客端
+
 将下面两个文件复制到 Windows 虚拟机：
 
 - `dist/urlbridge-browser.exe`
@@ -191,15 +197,72 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-host.ps1
 .\urlbridge-guestctl.exe uninstall
 ```
 
-### 访客端安装脚本
+### Windows 访客端安装脚本
 
-可以在仓库根目录运行，也可以在打包后的访客端 bundle 中运行：
+在仓库根目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-guest.ps1
 ```
 
+在打包后的 Windows 访客端 bundle 中运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-guest.ps1
+```
+
 访客端安装脚本默认会把配置写到 `%LOCALAPPDATA%\URLBridge\config.yaml`，并在注册 URL handler 时显式带上 `--config`。它会保留已有的 `browser_path`，并默认使用 3 秒的宿主机请求超时；如果 `browser_path` 仍为空，第一次真正发生本地浏览器回退时会自动探测并缓存。如果你希望完全显式配置，也可以继续传 `-HostUrl`、`-Token` 或 `-ConfigPath`。
+
+### Linux 访客端
+
+将下面两个 Linux 访客端文件复制到虚拟机：
+
+- `dist/urlbridge-browser-linux-amd64`
+- `dist/urlbridge-guestctl-linux-amd64`
+
+如果访客虚拟机是 Linux ARM64，请改用 `dist/urlbridge-browser-linux-arm64` 和 `dist/urlbridge-guestctl-linux-arm64`。
+
+显式安装示例：
+
+```bash
+./urlbridge-guestctl-linux-amd64 install --host-url http://10.0.2.2:38495 --token YOUR_TOKEN
+```
+
+也可以让虚拟机自动发现宿主机后完成安装：
+
+```bash
+./urlbridge-guestctl-linux-amd64 install
+```
+
+Linux 安装会把访客端二进制复制到 `~/.local/lib/urlbridge-guest`，把配置写到 `$XDG_CONFIG_HOME/urlbridge-guest/config.yaml` 或 `~/.config/urlbridge-guest/config.yaml`，在 `$XDG_DATA_HOME/applications` 或 `~/.local/share/applications` 下创建 `urlbridge-browser.desktop`，并注册 `x-scheme-handler/http` 与 `x-scheme-handler/https`，让 `xdg-open` 通过 URL Bridge 打开链接。
+
+常用 Linux 访客端命令：
+
+```bash
+./urlbridge-guestctl-linux-amd64 install --config ./config.yaml --host-url http://10.0.2.2:38495
+./urlbridge-guestctl-linux-amd64 discover
+./urlbridge-guestctl-linux-amd64 discover --config ./config.yaml
+./urlbridge-guestctl-linux-amd64 status
+./urlbridge-guestctl-linux-amd64 status --config ./config.yaml
+./urlbridge-guestctl-linux-amd64 uninstall
+xdg-open https://example.com
+```
+
+在仓库根目录运行：
+
+```bash
+./scripts/install-guest.sh --host-url http://10.0.2.2:38495 --token YOUR_TOKEN
+```
+
+在打包后的 Linux 访客端 bundle 中运行：
+
+```bash
+./install-guest.sh --host-url http://10.0.2.2:38495 --token YOUR_TOKEN
+```
+
+如果在配置超时内无法连接宿主机，Linux 访客端会回退到本地浏览器。`browser_path` 为空时，URL Bridge 会探测 Chrome、Chromium、Edge、Brave、Firefox 或 Vivaldi，并把第一个成功启动的浏览器写回配置。不要把 `browser_path` 设置为 `xdg-open`，因为注册完成后这会再次回到 URL Bridge。
+
+如果 `xdg-open https://example.com` 打印 `x-www-browser`、`firefox`、`chromium` 等一串浏览器不存在的日志，说明它没有派发到 URL Bridge。请重新运行 `urlbridge-guestctl-linux-amd64 install ...`，再用 `urlbridge-guestctl-linux-amd64 status` 检查；两个 XDG handler 都应是 `urlbridge-browser.desktop`。
 
 ## 当前限制
 
@@ -207,4 +270,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-guest.ps1
 - 它不会代理虚拟机里的 cookies、会话状态或浏览器用户配置。
 - 宿主机服务仍要求虚拟机能够通过所选虚拟网络访问宿主机。
 - 在 Windows 10/11 上，最终的默认应用绑定仍需要用户手动确认。
+- Linux 侧只注册当前用户的 `xdg-open` scheme handler，不会修改系统级默认应用。
 - UDP 自动发现是否可用，取决于虚拟机网络模式；如果广播被阻断，请改用可访问的 NAT 地址，例如 `10.0.2.2`，并显式传入 `--host-url`。

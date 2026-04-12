@@ -1,5 +1,3 @@
-//go:build windows
-
 package guest
 
 import (
@@ -7,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -46,7 +45,7 @@ func forwardToHost(targetURL string, cfg Config) hostForwardFailure {
 
 	body, err := json.Marshal(bridge.OpenRequest{
 		URL:    targetURL,
-		Source: "windows-vm",
+		Source: runtime.GOOS + "-vm",
 	})
 	if err != nil {
 		return hostForwardFailure{Err: fmt.Errorf("marshal request: %w", err)}

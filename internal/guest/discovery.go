@@ -1,5 +1,3 @@
-//go:build windows
-
 package guest
 
 import (
@@ -11,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/xmoon/urlbridge/internal/bridge"
@@ -366,22 +363,6 @@ func commonNATHostURLs() []string {
 		formatCandidateBaseURL("10.0.3.2", bridge.DefaultPort),
 		formatCandidateBaseURL("192.168.56.1", bridge.DefaultPort),
 	}
-}
-
-func enableUDPBroadcast(conn *net.UDPConn) error {
-	raw, err := conn.SyscallConn()
-	if err != nil {
-		return err
-	}
-
-	var sockErr error
-	if err := raw.Control(func(fd uintptr) {
-		sockErr = syscall.SetsockoptInt(syscall.Handle(fd), syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1)
-	}); err != nil {
-		return err
-	}
-
-	return sockErr
 }
 
 func formatCandidateBaseURL(host string, port int) string {

@@ -31,7 +31,7 @@ func runBrowserFallback(targetURL string, runtime browserFallbackRuntime) error 
 		failures := []string{fmt.Sprintf("configured browser (%s): %v", configuredPath, err)}
 		candidates := excludeBrowserCandidatePath(detectedBrowserCandidates(runtime.DetectCandidates), configuredPath)
 		if len(candidates) == 0 {
-			failures = append(failures, "no alternative local browser found; configure browser_path or install Chrome/Edge")
+			failures = append(failures, "no alternative local browser found; configure browser_path or install a supported local browser")
 			return openLocalBrowserError(failures)
 		}
 
@@ -57,7 +57,7 @@ func runBrowserFallback(targetURL string, runtime browserFallbackRuntime) error 
 func openDetectedBrowser(targetURL string, runtime browserFallbackRuntime) error {
 	candidates := detectedBrowserCandidates(runtime.DetectCandidates)
 	if len(candidates) == 0 {
-		return fmt.Errorf("no local browser found; configure browser_path or install Chrome/Edge")
+		return fmt.Errorf("no local browser found; configure browser_path or install a supported local browser")
 	}
 
 	var failures []string
